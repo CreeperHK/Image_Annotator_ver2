@@ -10,7 +10,6 @@
 <body class="bg-gray-950 text-white min-h-screen flex items-center justify-center">
 
     <div class="w-full max-w-2xl mx-auto p-6">
-        <!-- 標題 -->
         <div class="text-center mb-10">
             <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
                 🏷️ Image Annotator
@@ -19,7 +18,6 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
             <!-- 創建新項目 -->
             <div class="bg-gray-900 rounded-2xl p-6 border border-gray-800 hover:border-blue-500 transition-colors">
                 <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
@@ -27,6 +25,21 @@
                 </h2>
 
                 <form id="createForm" class="space-y-4">
+                    <!-- 新增：模式選擇 -->
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">專案標註模式</label>
+                        <div class="flex gap-4">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="projectMode" value="detect" checked class="text-blue-500 focus:ring-blue-500 bg-gray-800 border-gray-700">
+                                <span class="text-sm">目標偵測 (BBox)</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="projectMode" value="segment" class="text-purple-500 focus:ring-purple-500 bg-gray-800 border-gray-700">
+                                <span class="text-sm">圖像分割 (Polygon)</span>
+                            </label>
+                        </div>
+                    </div>
+
                     <div>
                         <label class="block text-sm text-gray-400 mb-1">項目名稱</label>
                         <input type="text" id="projectName" required
@@ -42,20 +55,16 @@
                     </div>
 
                     <div>
-                        <label class="block text-sm text-gray-400 mb-1">
-                            類別名稱（每行一個）
-                        </label>
+                        <label class="block text-sm text-gray-400 mb-1">類別名稱（每行一個）</label>
                         <textarea id="classNames" rows="4" required
                                   class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 resize-none"
                                   placeholder="dog&#10;cat&#10;bird"></textarea>
                     </div>
 
-                    <button type="submit"
-                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors">
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors">
                         創建項目
                     </button>
                 </form>
-
                 <div id="createError" class="hidden mt-3 text-red-400 text-sm bg-red-900/30 rounded-lg p-2"></div>
             </div>
 
@@ -64,14 +73,12 @@
                 <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
                     <span class="text-2xl">📂</span> 打開已有項目
                 </h2>
-
                 {% if projects %}
                     <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
-                        {% for p in projects %}
-                            <a href="/annotate/{{ p }}"
-                               class="block bg-gray-800 hover:bg-gray-700 rounded-lg px-4 py-3 transition-colors group">
+                        {% for proj in projects %}
+                            <a href="/annotate/{{ proj.name }}" class="block bg-gray-800 hover:bg-gray-700 rounded-lg px-4 py-3 transition-colors group">
                                 <div class="flex items-center justify-between">
-                                    <span class="font-medium group-hover:text-purple-400 transition-colors">{{ p }}</span>
+                                    <span class="font-medium group-hover:text-purple-400 transition-colors">{{ proj.name }} ({{ proj.mode }})</span>
                                     <span class="text-gray-500 text-sm">→</span>
                                 </div>
                             </a>
@@ -81,11 +88,9 @@
                     <div class="text-gray-500 text-center py-12">
                         <p class="text-4xl mb-2">📭</p>
                         <p>暫無已有項目</p>
-                        <p class="text-sm mt-1">請先創建一個新項目</p>
                     </div>
                 {% endif %}
             </div>
-
         </div>
     </div>
 
@@ -97,10 +102,8 @@
 
             const projectName = document.getElementById('projectName').value.trim();
             const imageFolder = document.getElementById('imageFolder').value.trim();
-            const classNames = document.getElementById('classNames').value
-                .split('\n')
-                .map(s => s.trim())
-                .filter(s => s.length > 0);
+            const mode = document.querySelector('input[name="projectMode"]:checked').value;
+            const classNames = document.getElementById('classNames').value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
 
             if (classNames.length === 0) {
                 errorDiv.textContent = '請至少輸入一個類別名稱';
@@ -115,12 +118,11 @@
                     body: JSON.stringify({
                         project_name: projectName,
                         image_folder: imageFolder,
-                        classes: classNames
+                        classes: classNames,
+                        mode: mode
                     })
                 });
-
                 const data = await res.json();
-
                 if (res.ok && data.success) {
                     window.location.href = `/annotate/${data.project_name}`;
                 } else {

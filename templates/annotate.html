@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Annotator - 標註</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="bg-gray-950 text-white h-screen flex flex-col overflow-hidden">
+
+    <!-- ====== 頂部工具欄 ====== -->
+    <header class="bg-gray-900 border-b border-gray-800 px-4 py-2 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-4">
+            <a href="/" class="text-gray-400 hover:text-white transition-colors text-sm">← 返回</a>
+            <h1 class="text-lg font-semibold">
+                🏷️ <span id="headerProjectName" class="text-blue-400"></span>
+            </h1>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <!-- 全局文本開關 -->
+            <button id="toggleLabelsBtn" onclick="toggleLabels()"
+                    class="px-3 py-1.5 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium transition-colors">
+                🏷️ 標籤: ON
+            </button>
+
+            <!-- 保存 -->
+            <button onclick="saveProject()"
+                    class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors">
+                💾 保存 (S)
+            </button>
+
+            <!-- 導出下拉 -->
+            <div class="relative">
+                <button onclick="toggleExportMenu()"
+                        class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium transition-colors">
+                    📤 導出 ▼
+                </button>
+                <div id="exportMenu" class="hidden absolute right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 min-w-[140px]">
+                    <a href="#" onclick="exportFormat('json')" class="block px-4 py-2 hover:bg-gray-700 text-sm">JSON 格式</a>
+                    <a href="#" onclick="exportFormat('yolo')" class="block px-4 py-2 hover:bg-gray-700 text-sm">YOLO 格式</a>
+                    <a href="#" onclick="exportFormat('xml')" class="block px-4 py-2 hover:bg-gray-700 text-sm">XML (VOC) 格式</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ====== 主體區域 ====== -->
+    <div class="flex flex-1 overflow-hidden">
+
+        <!-- 左側面板：類別列表 -->
+        <aside class="w-56 bg-gray-900 border-r border-gray-800 p-4 flex flex-col shrink-0">
+            <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">類別列表</h3>
+            <div id="classList" class="space-y-2 flex-1 overflow-y-auto"></div>
+
+            <div class="mt-4 pt-4 border-t border-gray-800">
+                <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">快捷鍵提示</h3>
+                <div class="text-xs text-gray-500 space-y-1">
+                    <p><kbd class="bg-gray-800 px-1 rounded">Q</kbd> / <kbd class="bg-gray-800 px-1 rounded">E</kbd> 切換類別</p>
+                    <p><kbd class="bg-gray-800 px-1 rounded">A</kbd> 上一張</p>
+                    <p><kbd class="bg-gray-800 px-1 rounded">D</kbd> 下一張</p>
+                    <p><kbd class="bg-gray-800 px-1 rounded">S</kbd> 儲存專案</p>
+                    <p><kbd class="bg-gray-800 px-1 rounded">右鍵</kbd> 取消繪製 / 刪除框</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 中間：畫布區域 -->
+        <main id="canvasContainer" class="flex-1 bg-gray-950 flex items-center justify-center overflow-hidden relative">
+            <canvas id="annotationCanvas"></canvas>
+            <!-- 加載提示 -->
+            <div id="loadingOverlay" class="absolute inset-0 bg-gray-950/80 flex items-center justify-center z-10">
+                <div class="text-gray-400 text-lg">⏳ 加載中...</div>
+            </div>
+            <!-- 完成提示 -->
+            <div id="completeOverlay" class="hidden absolute inset-0 bg-gray-950/90 flex items-center justify-center z-20">
+                <div class="text-center">
+                    <div class="text-6xl mb-4">🎉</div>
+                    <h2 class="text-3xl font-bold text-green-400 mb-2">Label Complete!</h2>
+                    <p class="text-gray-400">所有圖片已標註完成</p>
+                    <button onclick="document.getElementById('completeOverlay').classList.add('hidden')"
+                            class="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+                        確定
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- 右側面板：圖片信息與標註列表 -->
+        <aside class="w-64 bg-gray-900 border-l border-gray-800 p-4 flex flex-col shrink-0">
+            <!-- 圖片信息 -->
+            <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">圖片信息</h3>
+            <div class="bg-gray-800 rounded-lg p-3 text-sm space-y-1 mb-4">
+                <p>📄 <span id="infoFilename" class="text-gray-300">-</span></p>
+                <p>📐 <span id="infoSize" class="text-gray-300">-</span></p>
+                <p>📊 <span id="infoProgress" class="text-gray-300">-</span></p>
+            </div>
+
+            <!-- 標註列表 -->
+            <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                當前標註 (<span id="annotationCount">0</span>)
+            </h3>
+            <div id="annotationList" class="flex-1 overflow-y-auto space-y-1"></div>
+        </aside>
+    </div>
+
+    <!-- ====== 底部狀態欄 ====== -->
+    <footer class="bg-gray-900 border-t border-gray-800 px-4 py-1.5 flex items-center justify-between text-sm shrink-0">
+        <div class="flex items-center gap-4">
+            <button onclick="prevImage()" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded transition-colors">
+                ← 上一張 (A)
+            </button>
+            <button onclick="nextImage()" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded transition-colors">
+                下一張 (D) →
+            </button>
+        </div>
+        <div id="statusText" class="text-gray-400">就緒</div>
+        <div id="saveStatus" class="text-green-400 hidden">✓ 已保存</div>
+    </footer>
+
+    <!-- 傳遞項目名稱給 JS -->
+    <script>
+        const PROJECT_NAME = "{{ project_name }}";
+    </script>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

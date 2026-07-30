@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Annotator - 首頁</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="bg-gray-950 text-white min-h-screen flex items-center justify-center">
+
+    <div class="w-full max-w-2xl mx-auto p-6">
+        <!-- 標題 -->
+        <div class="text-center mb-10">
+            <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                🏷️ Image Annotator
+            </h1>
+            <p class="text-gray-400 mt-2">桌面級圖像標註工具 · Web 版</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <!-- 創建新項目 -->
+            <div class="bg-gray-900 rounded-2xl p-6 border border-gray-800 hover:border-blue-500 transition-colors">
+                <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                    <span class="text-2xl">📁</span> 創建新項目
+                </h2>
+
+                <form id="createForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">項目名稱</label>
+                        <input type="text" id="projectName" required
+                               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                               placeholder="例如: my_dataset">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">圖片文件夾路徑（絕對路徑）</label>
+                        <input type="text" id="imageFolder" required
+                               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                               placeholder="例如: D:/datasets/images">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">
+                            類別名稱（每行一個）
+                        </label>
+                        <textarea id="classNames" rows="4" required
+                                  class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 resize-none"
+                                  placeholder="dog&#10;cat&#10;bird"></textarea>
+                    </div>
+
+                    <button type="submit"
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors">
+                        創建項目
+                    </button>
+                </form>
+
+                <div id="createError" class="hidden mt-3 text-red-400 text-sm bg-red-900/30 rounded-lg p-2"></div>
+            </div>
+
+            <!-- 打開已有項目 -->
+            <div class="bg-gray-900 rounded-2xl p-6 border border-gray-800 hover:border-purple-500 transition-colors">
+                <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                    <span class="text-2xl">📂</span> 打開已有項目
+                </h2>
+
+                {% if projects %}
+                    <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
+                        {% for p in projects %}
+                            <a href="/annotate/{{ p }}"
+                               class="block bg-gray-800 hover:bg-gray-700 rounded-lg px-4 py-3 transition-colors group">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-medium group-hover:text-purple-400 transition-colors">{{ p }}</span>
+                                    <span class="text-gray-500 text-sm">→</span>
+                                </div>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-gray-500 text-center py-12">
+                        <p class="text-4xl mb-2">📭</p>
+                        <p>暫無已有項目</p>
+                        <p class="text-sm mt-1">請先創建一個新項目</p>
+                    </div>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('createForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const errorDiv = document.getElementById('createError');
+            errorDiv.classList.add('hidden');
+
+            const projectName = document.getElementById('projectName').value.trim();
+            const imageFolder = document.getElementById('imageFolder').value.trim();
+            const classNames = document.getElementById('classNames').value
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+
+            if (classNames.length === 0) {
+                errorDiv.textContent = '請至少輸入一個類別名稱';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/project/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        project_name: projectName,
+                        image_folder: imageFolder,
+                        classes: classNames
+                    })
+                });
+
+                const data = await res.json();
+
+                if (res.ok && data.success) {
+                    window.location.href = `/annotate/${data.project_name}`;
+                } else {
+                    errorDiv.textContent = data.error || '創建失敗';
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorDiv.textContent = '網絡錯誤，請確認 Flask 服務正在運行';
+                errorDiv.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

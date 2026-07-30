@@ -1,0 +1,33 @@
+/* 畫布十字光標 */
+#annotationCanvas {
+    cursor: crosshair;
+}
+
+/* 滾動條美化 */
+::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #666;
+}
+
+/* Fabric.js 畫布容器 */
+.canvas-container {
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+/* 快捷鍵標籤樣式 */
+kbd {
+    font-family: monospace;
+    font-size: 11px;
+}

@@ -14,7 +14,7 @@ def json_to_yolo(project_data):
             if 'bbox' not in label: continue
             class_id = label['label_class_id']
             bbox = label['bbox']
-            lines.append(f"{class_id} {bbox[0]:.6f} {bbox[1]:.6f} {bbox[2]:.6f} {bbox[3]:.6f}")
+            lines.append(f"{class_id} {bbox[0]:.10f} {bbox[1]:.10f} {bbox[2]:.10f} {bbox[3]:.10f}")
         results[f"{filename}.txt"] = '\n'.join(lines)
     classes = [c['name'] for c in sorted(project_data.get('class_info', []), key=lambda x: x['id'])]
     results['classes.txt'] = '\n'.join(classes)
@@ -73,7 +73,7 @@ def json_to_yolo_seg(project_data):
             if 'polygon' not in label: continue
             class_id = label['label_class_id']
             poly = label['polygon'] # [[x,y], [x,y]...]
-            coords = " ".join([f"{pt[0]:.6f} {pt[1]:.6f}" for pt in poly])
+            coords = " ".join([f"{pt[0]:.10f} {pt[1]:.10f}" for pt in poly])
             lines.append(f"{class_id} {coords}")
         results[f"{filename}.txt"] = '\n'.join(lines)
     

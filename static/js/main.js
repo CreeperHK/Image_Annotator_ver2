@@ -16,6 +16,7 @@ let originalImageWidth = 0;
 let originalImageHeight = 0;
 let crosshairX = null;
 let crosshairY = null;
+let isNavigating = false;
 
 // 分割模式專用狀態
 let activePolyPoints = [];
@@ -426,18 +427,79 @@ function resetDrawingState() {
     drawingState = 'idle';
 }
 
-function nextImage() { resetDrawingState(); if(currentImageIndex >= currentProject.data.length - 1) { saveProject(); document.getElementById('completeOverlay').classList.remove('hidden'); return; } saveProject(); loadImage(currentImageIndex + 1); }
-function prevImage() { resetDrawingState(); if(currentImageIndex <= 0) return; saveProject(); loadImage(currentImageIndex - 1); }
+function nextImage() {
+    if (isNavigating) return; // 防快速點擊造成多個並行流程
+    isNavigating = true;
+    resetDrawingState();
+
+    saveProject().then(success => {
+        if (!success) {
+            setStatus('⚠️ 保存失敗，無法切換');
+            isNavigating = false;
+            return;
+        }
+        if (currentImageIndex >= currentProject.data.length - 1) {
+            // 已是最後一張圖
+            document.getElementById('completeOverlay').classList.remove('hidden');
+        } else {
+            loadImage(currentImageIndex + 1);
+        }
+        isNavigating = false;
+    });
+}
+
+function prevImage() {
+    if (isNavigating) return;
+    isNavigating = true;
+    resetDrawingState();
+
+    saveProject().then(success => {
+        if (!success) {
+            setStatus('⚠️ 保存失敗，無法切換');
+            isNavigating = false;
+            return;
+        }
+        if (currentImageIndex <= 0) {
+            // 已是第一張圖，不需切換
+        } else {
+            loadImage(currentImageIndex - 1);
+        }
+        isNavigating = false;
+    });
+}
+
 
 async function saveProject() {
-    if (!currentProject) return;
+    if (!currentProject) return false;
     try {
         const clean = JSON.parse(JSON.stringify(currentProject));
+        // 移除內部使用的 _annId，避免序列化到後端
         clean.data.forEach(img => img.labels.forEach(lbl => delete lbl._annId));
-        const res = await fetch(`/api/project/${PROJECT_NAME}/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(clean) });
-        if (res.ok) { isDirty = false; document.getElementById('saveStatus').classList.remove('hidden'); setTimeout(()=>document.getElementById('saveStatus').classList.add('hidden'), 2000); setStatus('已保存'); }
-    } catch (e) { setStatus('保存錯誤'); }
+
+        const res = await fetch(`/api/project/${PROJECT_NAME}/save`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(clean)
+        });
+
+        if (res.ok) {
+            isDirty = false;
+            document.getElementById('saveStatus').classList.remove('hidden');
+            setTimeout(() => document.getElementById('saveStatus').classList.add('hidden'), 2000);
+            setStatus('✓ 已保存');
+            return true;   // ← 成功回傳 true
+        } else {
+            // 可根據實際 API 錯誤訊息做更詳細的處理
+            console.error('Save failed with status:', res.status);
+            return false;
+        }
+    } catch (e) {
+        console.error('Save error:', e);
+        setStatus('⚠️ 儲存時發生網路或編碼錯誤');
+        return false;
+    }
 }
+
 
 function toggleExportMenu() { document.getElementById('exportMenu').classList.toggle('hidden'); }
 function exportFormat(fmt) { toggleExportMenu(); saveProject(); window.open(`/api/export/${PROJECT_NAME}/${fmt}`, '_blank'); }

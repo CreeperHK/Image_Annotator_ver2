@@ -119,7 +119,7 @@ def create_project():
     unique_classes = []
     colors = [
     '#FF2D55',  # Red / Pink
-    '#FF3B30',  # Bright Red
+    "#30FF6E",  # Bright Red
     '#FF9500',  # Orange
     '#FFCC00',  # Yellow
     '#30D158',  # Green

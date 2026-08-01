@@ -95,8 +95,10 @@ function setupModeUI() {
             <p><kbd class="bg-gray-800 px-1 rounded">Space</kbd> 閉合多邊形</p>
             <p><kbd class="bg-gray-800 px-1 rounded">Ctrl+Z</kbd> 復原上一個頂點</p>
             <p><kbd class="bg-gray-800 px-1 rounded">右鍵</kbd> 取消整個多邊形/刪除</p>
-            <p><kbd class="bg-gray-800 px-1 rounded">拖曳頂點</kbd> 調整已完成的圖形</p>
-            <p><kbd class="bg-gray-800 px-1 rounded">Q / E / A / D / S</kbd> 功能依舊</p>`;
+            <p><kbd class="bg-gray-800 px-1 rounded">Ctrl+左鍵</kbd> 調整已完成的圖形</p>
+            <p><kbd class="bg-gray-800 px-1 rounded">Q</kbd> / <kbd class="bg-gray-800 px-1 rounded">E</kbd> 切換類別</p>
+            <p><kbd class="bg-gray-800 px-1 rounded">A</kbd> / <kbd class="bg-gray-800 px-1 rounded">D</kbd> 切換圖片</p>
+            <p><kbd class="bg-gray-800 px-1 rounded">S</kbd> 儲存專案</p>`;
     }
 
     const exportMenu = document.getElementById('exportMenu');
@@ -202,7 +204,7 @@ function addLabelText(cls, left, top, annId) {
 // ========== 滑鼠與繪製邏輯 ==========
 function handleMouseDown(opt) {
     const e = opt.e;
-    const target = opt.target;
+    let target = opt.target;
 
     if (e.button === 2) { // 右鍵
         e.preventDefault();
@@ -218,13 +220,23 @@ function handleMouseDown(opt) {
     
     if (e.button !== 0) return; // 只處理左鍵
 
+    if (currentMode === 'segment' && drawingState === 'idle' && target && target.type === 'polygon') {
+        if (e.ctrlKey || e.metaKey) {
+            enablePolygonEdit(target); 
+            return;
+        }
+    }
+
+    if (target && target.annotationId && !target.isControlCircle) {
+        if (drawingState === 'idle') {
+            target = null;
+        }
+    }
+
     const pointer = canvas.getPointer(e);
 
-    // Segment 編輯模式：點擊多邊形本體
     if (currentMode === 'segment' && drawingState === 'idle') {
-        if (target && target.type === 'polygon') {
-            enablePolygonEdit(target); return;
-        } else if (!target || (target && !target.isControlCircle)) {
+        if (!target || (target && !target.isControlCircle)) {
             disablePolygonEdit();
         }
     }
@@ -353,7 +365,6 @@ function finishPolygon() {
     isDirty = true; canvas.renderAll(); updateAnnotationList(); setStatus('已新增多邊形');
 }
 
-// 多邊形編輯邏輯 (拖曳頂點)
 function enablePolygonEdit(polygon) {
     disablePolygonEdit();
     activePolygonRef = polygon;
@@ -361,20 +372,31 @@ function enablePolygonEdit(polygon) {
     const matrix = polygon.calcTransformMatrix();
     
     pts.forEach((pt, idx) => {
-        const abs = fabric.util.transformPoint({x: pt.x, y: pt.y}, matrix);
-        const ctrl = new fabric.Circle({ left: abs.x, top: abs.y, radius: 5, fill: '#ffffff', stroke: '#ff0000', strokeWidth: 2, originX: 'center', originY: 'center', hasControls: false, hasBorders: false, selectable: true, evented: true, isControlCircle: true });
+        const abs = fabric.util.transformPoint({
+            x: pt.x - polygon.pathOffset.x, 
+            y: pt.y - polygon.pathOffset.y
+        }, matrix);
+        
+        const ctrl = new fabric.Circle({ 
+            left: abs.x, top: abs.y, radius: 5, fill: '#ffffff', stroke: '#ff0000', 
+            strokeWidth: 2, originX: 'center', originY: 'center', hasControls: false, 
+            hasBorders: false, selectable: true, evented: true, isControlCircle: true 
+        });
         
         ctrl.on('moving', function() {
             const inverted = fabric.util.invertTransform(polygon.calcTransformMatrix());
             const newPt = fabric.util.transformPoint({x: ctrl.left, y: ctrl.top}, inverted);
-            polygon.points[idx].x = newPt.x;
-            polygon.points[idx].y = newPt.y;
+            
+            polygon.points[idx].x = newPt.x + polygon.pathOffset.x;
+            polygon.points[idx].y = newPt.y + polygon.pathOffset.y;
             polygon.setCoords();
             canvas.renderAll();
             
-            // 同步更新 JSON Data
             const normPts = polygon.points.map(p => {
-                const absP = fabric.util.transformPoint(p, polygon.calcTransformMatrix());
+                const absP = fabric.util.transformPoint({
+                    x: p.x - polygon.pathOffset.x, 
+                    y: p.y - polygon.pathOffset.y
+                }, polygon.calcTransformMatrix());
                 return [ absP.x / (originalImageWidth * scaleRatio), absP.y / (originalImageHeight * scaleRatio) ];
             });
             updatePolygonData(polygon.annotationId, normPts);
@@ -385,11 +407,13 @@ function enablePolygonEdit(polygon) {
     canvas.bringToFront(polygon); vertexControls.forEach(c => canvas.bringToFront(c));
     canvas.renderAll();
 }
+
 function disablePolygonEdit() {
     vertexControls.forEach(c => canvas.remove(c));
     vertexControls = []; activePolygonRef = null;
     canvas.renderAll();
 }
+
 function updatePolygonData(annId, newNormPts) {
     const imgData = currentProject.data[currentImageIndex];
     const lbl = imgData.labels.find(l => l._annId === annId);

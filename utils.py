@@ -108,7 +108,7 @@ def json_to_coco(project_data):
         for label in img_data.get('labels', []):
             if 'polygon' not in label: continue
             poly_norm = label['polygon']
-            poly_abs = [[p[0]*img_w, p[1]*img_h] for p in poly_norm]
+            poly_abs = [[int(round(p[0]*img_w)), int(round(p[1]*img_h))] for p in poly_norm]
             
             x_coords = [p[0] for p in poly_abs]
             y_coords = [p[1] for p in poly_abs]

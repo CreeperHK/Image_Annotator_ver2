@@ -181,12 +181,12 @@ function loadExistingAnnotations() {
 
         if (currentMode === 'detect' && label.bbox) {
             const coords = yoloToCanvas(label.bbox[0], label.bbox[1], label.bbox[2], label.bbox[3]);
-            const rect = new fabric.Rect({ left: coords.left, top: coords.top, width: coords.width, height: coords.height, fill: cls.color+'22', stroke: cls.color, strokeWidth: 2, selectable: false, evented: false, annotationId: annId, classId: cls.id });
+            const rect = new fabric.Rect({ left: coords.left, top: coords.top, width: coords.width, height: coords.height, fill: cls.color+'22', stroke: cls.color, strokeWidth: 2, selectable: false, evented: true, annotationId: annId, classId: cls.id });
             canvas.add(rect);
             addLabelText(cls, coords.left, coords.top, annId);
         } else if (currentMode === 'segment' && label.polygon) {
             const pts = label.polygon.map(p => ({ x: p[0] * originalImageWidth * scaleRatio, y: p[1] * originalImageHeight * scaleRatio }));
-            const poly = new fabric.Polygon(pts, { fill: cls.color+'33', stroke: cls.color, strokeWidth: 2, selectable: false, evented: false, annotationId: annId, classId: cls.id, objectCaching: false });
+            const poly = new fabric.Polygon(pts, { fill: cls.color+'33', stroke: cls.color, strokeWidth: 2, selectable: false, evented: true, annotationId: annId, classId: cls.id, objectCaching: false });
             canvas.add(poly);
             
             const minX = Math.min(...pts.map(p => p.x)), minY = Math.min(...pts.map(p => p.y));
@@ -424,7 +424,7 @@ function updatePolygonData(annId, newNormPts) {
 function canvasToYOLO(left, top, w, h) {
     const xC = (left/scaleRatio + (w/scaleRatio)/2) / originalImageWidth;
     const yC = (top/scaleRatio + (h/scaleRatio)/2) / originalImageHeight;
-    return [xC, yC, w/scaleRatio/originalImageWidth, h/scaleRatio/originalImageHeight].map(v => parseFloat(Math.max(0, Math.min(1, v)).toFixed(6)));
+    return [xC, yC, w/scaleRatio/originalImageWidth, h/scaleRatio/originalImageHeight].map(v => parseFloat(Math.max(0, Math.min(1, v)).toFixed(10)));
 }
 function yoloToCanvas(xC, yC, nW, nH) {
     const absW = nW * originalImageWidth, absH = nH * originalImageHeight;

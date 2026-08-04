@@ -235,6 +235,14 @@ function handleMouseDown(opt) {
 
     const pointer = canvas.getPointer(e);
 
+    if (currentMode === 'segment' && drawingState === 'idle' && activePolygonRef) {
+        if (!target || target === activePolygonRef || !target.isControlCircle) {
+            if (tryInsertVertexOnEdge(activePolygonRef, pointer)) {
+                return; // 新增頂點後維持編輯狀態，不觸發 disablePolygonEdit
+            }
+        }
+    }
+
     if (currentMode === 'segment' && drawingState === 'idle') {
         if (!target || (target && !target.isControlCircle)) {
             disablePolygonEdit();
@@ -371,6 +379,9 @@ function enablePolygonEdit(polygon) {
     const pts = polygon.get('points');
     const matrix = polygon.calcTransformMatrix();
     
+    const cls = currentProject.class_info.find(c => c.id === polygon.classId);
+    const strokeColor = cls ? cls.color : (polygon.stroke || '#00ffcc');
+    
     pts.forEach((pt, idx) => {
         const abs = fabric.util.transformPoint({
             x: pt.x - polygon.pathOffset.x, 
@@ -378,9 +389,19 @@ function enablePolygonEdit(polygon) {
         }, matrix);
         
         const ctrl = new fabric.Circle({ 
-            left: abs.x, top: abs.y, radius: 5, fill: '#ffffff', stroke: '#ff0000', 
-            strokeWidth: 2, originX: 'center', originY: 'center', hasControls: false, 
-            hasBorders: false, selectable: true, evented: true, isControlCircle: true 
+            left: abs.x, 
+            top: abs.y, 
+            radius: 5, 
+            fill: '#ffffff',
+            stroke: strokeColor,
+            strokeWidth: 2, 
+            originX: 'center', 
+            originY: 'center', 
+            hasControls: false, 
+            hasBorders: false, 
+            selectable: true, 
+            evented: true, 
+            isControlCircle: true 
         });
         
         ctrl.on('moving', function() {
@@ -406,6 +427,71 @@ function enablePolygonEdit(polygon) {
     });
     canvas.bringToFront(polygon); vertexControls.forEach(c => canvas.bringToFront(c));
     canvas.renderAll();
+}
+
+function tryInsertVertexOnEdge(polygon, pointer) {
+    if (!polygon || !polygon.points || polygon.points.length < 3) return false;
+
+    const matrix = polygon.calcTransformMatrix();
+    const absPts = polygon.points.map(pt => fabric.util.transformPoint({
+        x: pt.x - polygon.pathOffset.x,
+        y: pt.y - polygon.pathOffset.y
+    }, matrix));
+
+    const threshold = 8;
+    let minDistance = Infinity;
+    let bestIndex = -1;
+    let bestProj = null;
+
+    for (let i = 0; i < absPts.length; i++) {
+        const p1 = absPts[i];
+        const p2 = absPts[(i + 1) % absPts.length];
+        
+        const res = pointToSegmentDistance(pointer, p1, p2);
+        if (res.dist < minDistance && res.dist <= threshold) {
+            minDistance = res.dist;
+            bestIndex = i;
+            bestProj = res.proj;
+        }
+    }
+
+    if (bestIndex !== -1 && bestProj) {
+        const inverted = fabric.util.invertTransform(matrix);
+        const relPt = fabric.util.transformPoint(bestProj, inverted);
+        const newPolyPt = {
+            x: relPt.x + polygon.pathOffset.x,
+            y: relPt.y + polygon.pathOffset.y
+        };
+
+        polygon.points.splice(bestIndex + 1, 0, newPolyPt);
+        polygon.setCoords();
+
+        const normPts = polygon.points.map(p => {
+            const absP = fabric.util.transformPoint({
+                x: p.x - polygon.pathOffset.x, 
+                y: p.y - polygon.pathOffset.y
+            }, polygon.calcTransformMatrix());
+            return [ absP.x / (originalImageWidth * scaleRatio), absP.y / (originalImageHeight * scaleRatio) ];
+        });
+        updatePolygonData(polygon.annotationId, normPts);
+        isDirty = true;
+
+        enablePolygonEdit(polygon);
+        return true;
+    }
+
+    return false;
+}
+
+function pointToSegmentDistance(p, a, b) {
+    const l2 = (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
+    if (l2 === 0) {
+        return { dist: Math.hypot(p.x - a.x, p.y - a.y), proj: { x: a.x, y: a.y } };
+    }
+    let t = ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    const proj = { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) };
+    return { dist: Math.hypot(p.x - proj.x, p.y - proj.y), proj: proj };
 }
 
 function disablePolygonEdit() {
